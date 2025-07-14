@@ -1,15 +1,12 @@
-const urlStore = {};
-
+const urlDatabase = {};
 function saveUrl(shortcode, data) {
-  urlStore[shortcode] = data;
+  urlDatabase[shortcode] = data;
 }
-
 function getUrl(shortcode) {
-  return urlStore[shortcode] || null;
+  return urlDatabase[shortcode] || null;
 }
-
 function shortcodeExists(shortcode) {
-  return !!urlStore[shortcode];
+  return Boolean(urlDatabase[shortcode]);
 }
 
 module.exports = {

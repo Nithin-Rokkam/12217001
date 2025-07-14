@@ -5,60 +5,61 @@ const { saveUrl, getUrl, shortcodeExists } = require('../models/urlstore');
 
 router.post('/', (req, res) => {
   if (!req.body) {
-    return res.status(400).json({ error: 'Missing request body.' });
+    return res.status(400).json({ error: 'Whoops! No data received. Please send a JSON body.' });
   }
   const { url, validity, shortcode } = req.body;
   if (!url || typeof url !== 'string' || !/^https?:\/\/.+\..+/.test(url)) {
-    return res.status(400).json({ error: 'Invalid or missing URL.' });
+    return res.status(400).json({ error: 'Please provide a valid URL (must start with http:// or https://).' });
   }
 
-  let code = shortcode;
-  if (code) {
-    if (!isValidShortcode(code)) {
-      return res.status(400).json({ error: 'Invalid shortcode format.' });
+  let chosenCode = shortcode;
+  if (chosenCode) {
+    if (!isValidShortcode(chosenCode)) {
+      return res.status(400).json({ error: 'Custom shortcode must be 4-10 alphanumeric characters.' });
     }
-    if (shortcodeExists(code)) {
-      return res.status(409).json({ error: 'Shortcode already exists.' });
+    if (shortcodeExists(chosenCode)) {
+      return res.status(409).json({ error: 'Sorry, that shortcode is already taken. Try another!' });
     }
   } else {
     do {
-      code = generateShortcode();
-    } while (shortcodeExists(code));
+      chosenCode = generateShortcode();
+    } while (shortcodeExists(chosenCode));
   }
 
   const now = new Date();
   const minutes = Number.isInteger(validity) ? validity : 30;
-  const expiry = new Date(now.getTime() + minutes * 60000);
+  const expiresAt = new Date(now.getTime() + minutes * 60000);
 
-  saveUrl(code, {
+  saveUrl(chosenCode, {
     originalUrl: url,
     createdAt: now,
-    expiry,
+    expiry: expiresAt,
     clicks: []
   });
 
   res.status(201).json({
-    shortLink: `${req.protocol}://${req.get('host')}/${code}`,
-    expiry: expiry.toISOString()
+    shortLink: `${req.protocol}://${req.get('host')}/${chosenCode}`,
+    expiry: expiresAt.toISOString()
   });
 });
 
+// Endpoint to get analytics for a short URL
 router.get('/:shortcode', (req, res) => {
   const code = req.params.shortcode;
-  const data = getUrl(code);
-  if (!data) {
-    return res.status(404).json({ error: 'Shortcode not found.' });
+  const record = getUrl(code);
+  if (!record) {
+    return res.status(404).json({ error: 'No stats found for that shortcode.' });
   }
   const now = new Date();
-  if (now > data.expiry) {
-    return res.status(410).json({ error: 'Short link expired.' });
+  if (now > record.expiry) {
+    return res.status(410).json({ error: 'This short link has expired. No stats available.' });
   }
   res.json({
-    originalUrl: data.originalUrl,
-    createdAt: data.createdAt,
-    expiry: data.expiry,
-    totalClicks: data.clicks.length,
-    clicks: data.clicks
+    originalUrl: record.originalUrl,
+    createdAt: record.createdAt,
+    expiry: record.expiry,
+    totalClicks: record.clicks.length,
+    clicks: record.clicks
   });
 });
 
